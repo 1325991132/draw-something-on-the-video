@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <!-- <meta name="apple-mobile-web-app-capable" content="yes" /> -->
+    <link rel="shortcut icon" href="#">
+    <script src="static/vendors/jquery/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="static/vendors/bootstrap/bootstrap.css">
+    <meta name="viewport"
+        content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no">
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: skyblue;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* main */
+        .container #body_ {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            height: 60%;
+            min-height: 600px;
+        }
+
+        /* canvas、video */
+        .container #body_ #videowrapper {
+            width: 960px;
+            margin: 0 auto;
+            background: url('./img/1.jpg') center 0;
+            background-size: cover;
+            position: relative;
+        }
+
+        .container #body_ #videowrapper canvas,
+        video {
+            border: 0px solid #f00;
+            width: 960px;
+            height: 540px;
+            height: auto;
+            position: absolute;
+            left: 0;
+            top: 0;
+
+        }
+
+        .container #body_ #videowrapper canvas {
+            z-index: 9;
+        }
+
+
+        /* video控制 进度条和时间 */
+        .container #body_ #controlWrap {
+            width: 960px;
+        }
+
+        /* 进度条 */
+        .container #body_ #controlWrap #progressWrap {
+            background-color: #ccc;
+            height: 20px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .container #body_ #controlWrap #progressWrap #playProgress {
+            background-color: #000;
+            width: 0px;
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        /* 下方工具 */
+        .tools {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 0 20%;
+        }
+
+        .tools .colorBox {
+            flex: 1;
+        }
+
+        .tools .btnBox {
+            flex: 6;
+        }
+
+        .buttonBox1,
+        .buttonBox2 {
+            margin: 20px auto;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .buttonBox1 button {
+            width: 80px;
+            height: 40px;
+        }
+
+        .buttonBox2 button {
+            width: 80px;
+            height: 50px;
+        }
+
+        .color_btn {
+            width: 50%;
+            height: 25px;
+            margin-bottom: 8px;
+        }
+
+        .btn_click {
+            opacity: 0.6;
+            border: solid 2px #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="body_">
+            <div id="videowrapper" ontouchmove="return false;">
+                <canvas id="my"></canvas>
+                <video id="videoelement" src="./video/1.mp4" type='video/mp4' poster="./img/1.jpg"></video>
+            </div>
+            <div id="controlWrap">
+                <div class="videotime">
+                    <span id="now_time" size="3">00:00</span> /
+                    <span id="duration" size="3">00:00</span>
+                </div>
+                <div id="progressWrap">
+                    <div id="playProgress"></div>
+                </div>
+            </div>
+        </div>
+        <div class="tools">
+            <div class="colorBox">
+                <p>画笔颜色：</p>
+                <button id="color1" class="btn color_btn btn_click" style="background-color: #f00;"
+                    onclick="change_color('#f00',1)"></button>
+                <button id="color2" class="btn  color_btn" style="background-color: #ff0;"
+                    onclick="change_color('#ff0',2)"></button>
+                <button id="color3" class="btn  color_btn" style="background-color: #00f;"
+                    onclick="change_color('#00f',3)"></button>
+            </div>
+            <div class="btnBox">
+                <div class="buttonBox1">
+                    <button id="pen1" class="btn btn-info " onclick="change_flag(1)">画笔</button>
+                    <button id="pen2" class="btn btn-info" onclick="change_flag(2)">画箭头</button>
+                    <button id="pen3" class="btn btn-info" onclick="change_flag(3)">画虚线</button>
+                    <button class="btn btn-info" onclick="undo_line()">撤销</button>
+                    <button class="btn btn-info" onclick="clear_line()">清空</button>
+                </div>
+                <div class="buttonBox2">
+                    <button class="btn btn-info" onclick="play()">播放</button>
+                    <button class="btn btn-info" onclick="pause()">暂停</button>
+                    <button class="btn btn-info" onclick="restart()">重播</button>
+                    <button class="btn btn-info" onclick="speed(-1)">快退1s</button>
+                    <button class="btn btn-info" onclick="speed(1)">快进1s</button>
+                    <button class="btn btn-info" onclick="prev()">上一个</button>
+                    <button class="btn btn-info" onclick="next()">下一个</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript">
+    var videoNum = 1;// 视频数量，请求php文件更新，如不在php可用的服务器运行会默认此数量为1
+    var v = document.getElementById("videoelement");//video元素
+    var c = document.getElementById("my");//canvas元素
+    var _bodywrapper = document.getElementById("body_");//bodywapper
+    console.log(v.currentTime); // 视频当前时间
+    var centerwidth = 960
+    var centerheight = 540
+    var offsetc = getoffset(c)// 获取画布距离左和距离上的值
+    c.width = centerwidth;// 设置画布大小
+    c.height = centerheight;// 设置画布大小
+    var ctx = c.getContext("2d");
+    var sum = 0;// 控制大屏所需，目前无作用
+    var text = '';// 控制大屏所需，目前无作用
+    var lineInitColor = "#f00";//当前颜色
+    var lineInitWidth = 2;//当前粗细
+    ctx.strokeStyle = lineInitColor;//画笔默认红色
+    ctx.lineWidth = lineInitWidth;//画笔粗细15
+    let step = -1;//撤销画布步数
+    var flag = 0;//记录当前处于写画、画箭头、画虚线箭头的flag
+    var line_step_num = 2;// 控制大屏所需，目前无作用
+    var videoInit = 1;//默认视频1
+    let canvasHistory = [];// 存储每一笔画布状态的数组
+    var boxGesture = setGesture(c); //得到一个对象
+    var startX, startY, movingX, movingY, endX, endY; //箭头变量
+
+    window.onload = function () {
+        getVideoCount();
+        clear_line();
+    }
+
+    //快进、快退几秒
+    function speed(num) {
+        flag = 0;
+        clear_line();
+        v.currentTime += num;
+        console.log(v.currentTime);
+        pen_click_remove();
+    }
+
+    // 获取当前元素的位置,距离屏幕左和上
+    function getoffset(element) {
+        let offset = {
+            left: 0,
+            top: 0
+        }
+        offset.left += element.offsetLeft
+        offset.top += element.offsetTop
+        while (element = element.offsetParent) {
+            offset.left += element.offsetLeft
+            offset.top += element.offsetTop
+        }
+        return offset;
+    }
+
+    // 改变颜色
+    function change_color(colorStr, num) {
+        lineInitColor = colorStr;
+        $("#color1").removeClass("btn_click");
+        $("#color2").removeClass("btn_click");
+        $("#color3").removeClass("btn_click");
+        $("#color" + num).addClass("btn_click");
+    }
+
+    // 获取视频数量
+    function getVideoCount() {
+        try {
+            $.ajax({
+                url: "./getFile.php",
+                type: "GET",
+                cache: false,
+                ifModified: true,
+                success: function (data) {
+                    console.log(data);
+                    videoNum = data;
+                }
+            })
+        } catch (err) {
+            videoNum = 1//默认写一个吧
+        }
+    }
+
+    // 下一个视频
+    function next() {
+        if (videoInit >= videoNum) {
+            videoInit = videoNum;
+        } else {
+            videoInit += 1;
+            $("#videoelement").attr("src", './video/' + videoInit + '.mp4');
+            changeVideoTimeChangeFn();
+            clear_line();
+            flag = 0;
+        }
+        pen_click_remove();
+    }
+
+    // 上一个视频
+    function prev() {
+        if (videoInit <= 1) {
+            videoInit = 1;
+        } else {
+            videoInit -= 1;
+            $("#videoelement").attr("src", './video/' + videoInit + '.mp4');
+            changeVideoTimeChangeFn();
+            clear_line();
+            flag = 0;
+        }
+        pen_click_remove();
+    }
+
+    // 撤销
+    function undo_line() {
+        canvasUndo();
+    }
+
+    // 清空画布
+    function clear_line() {
+        clearCanvas();
+        step = -1;
+        canvasHistory = [];
+    }
+
+    // 清除当前写画
+    function clearCanvas() {
+        var c = document.getElementById("my");
+        var cxt = c.getContext("2d");
+        c.height = c.height;
+        ctx.strokeStyle = lineInitColor;
+        ctx.lineWidth = lineInitWidth;
+    }
+
+
+    /*禁止ios缩放，双击和双指*/
+    window.οnlοad = function () {
+        document.addEventListener('touchstart', function (event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        });
+        var lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            var now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 500) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+        document.addEventListener('gesturestart', function (event) {
+            event.preventDefault();
+        });
+    };
+    document.addEventListener('gesturestart', function (event) {
+        event.preventDefault();
+    });
+
+    /* 清除touch默认事件 */
+    _bodywrapper.ontouchstart = function (e) {
+        e.preventDefault();
+    }
+    _bodywrapper.ontouchmove = function (e) {
+        e.preventDefault();
+    }
+    _bodywrapper.ontouchendend = function (e) {
+        e.preventDefault();
+    }
+
+    // 绘制方法
+    function canvasDraw() {
+        step++;
+        if (step < canvasHistory.length) {
+            canvasHistory.length = step; // 截断数组
+        }
+        // 执行绘制的相关操作（如绘制图片、线条等）
+        // ...
+        // ...
+        canvasHistory.push(c.toDataURL()); // 添加新的绘制到历史记录
+        // alert(step);
+    }
+
+    // 撤销方法
+    function canvasUndo() {
+        if (step >= 0) {
+            step--;
+            ctx.clearRect(0, 0, centerwidth, centerheight);
+            let canvasPic = new Image();
+            canvasPic.src = canvasHistory[step];
+            canvasPic.addEventListener('load', () => {
+                ctx.drawImage(canvasPic, 0, 0);
+            });
+            clearCanvas();
+        } else {
+            console.log('不能再继续撤销了');
+        }
+    }
+
+    // 反撤销方法
+    function canvasRedo() {
+        if (step < canvasHistory.length - 1) {
+            step++;
+            let canvasPic = new Image();
+            canvasPic.src = canvasHistory[step];
+            canvasPic.addEventListener('load', () => {
+                ctx.clearRect(0, 0, centerwidth, centerheight);
+                ctx.drawImage(canvasPic, 0, 0);
+            });
+        } else {
+            console.log('已经是最新的记录了');
+        }
+    }
+
+    // 清除按钮按下class
+    function pen_click_remove() {
+        $("#pen1").removeClass("btn_click");
+        $("#pen2").removeClass("btn_click");
+        $("#pen3").removeClass("btn_click");
+    }
+
+    //更新画笔状态值
+    function change_flag(num) {
+        if (num == 1 || num == 2 || num == 3) {
+            pause();
+        }
+        flag = num;
+        pen_click_remove()
+        $("#pen" + num).addClass("btn_click");
+    }
+
+    /* 将传入的element绑定touch事件 */
+    function setGesture(el) {
+        var obj = {}; //定义一个对象
+        var istouch = false;
+        var start = [];
+        var One_hd = [];
+        var can_move = false;
+        el.addEventListener("touchstart", function (e) {
+            ctx.strokeStyle = lineInitColor;
+
+            positionx = e.changedTouches[0].clientX - offsetc.left
+            positiony = e.changedTouches[0].clientY - offsetc.top;
+
+            if (flag == 1) {
+                ctx.beginPath();
+                ctx.setLineDash([]);
+                e.preventDefault();
+                text = '';
+                var e = e || event;
+                var ox = positionx;
+                var oy = positiony;
+                ctx.moveTo(ox, oy);
+                // onkey_down
+                ox = ox / centerwidth * 2242;
+                oy = oy / centerheight * 1258;
+            } else if (flag == 2) {
+                startX = positionx;
+                startY = positiony;
+                console.log(startX + "---start--" + startY); //鼠标按下
+                return false;
+            } else if (flag == 3) {
+                startX = positionx;
+                startY = positiony;
+                console.log(startX + "---start--" + startY); //鼠标按下
+                return false;
+            }
+
+        }, false);
+        el.addEventListener("touchmove", function (e) {
+            var positionx = e.changedTouches[0].clientX - offsetc.left
+            var positiony = e.changedTouches[0].clientY - offsetc.top;
+            // e.preventDefault();
+            if (flag == 1) {
+                var ox2 = positionx;
+                var oy2 = positiony;
+
+                ctx.lineTo(ox2, oy2);
+                ctx.stroke();
+                ox2 = ox2 / centerwidth * 2242;
+                oy2 = oy2 / centerheight * 1258;
+                sum++;
+                if (sum % line_step_num == 0) {
+                    text += ox2 + "," + (oy2 * -1) + ",0.000000,0#";
+                }
+            } else if (flag == 2) {
+                movingX = positionx;
+                movingY = positiony;
+            } else if (flag == 3) {
+                movingX = positionx;
+                movingY = positiony;
+            }
+
+        }, false);
+        el.addEventListener("touchend", function (e) {
+            var positionx = e.changedTouches[0].clientX - offsetc.left
+            var positiony = e.changedTouches[0].clientY - offsetc.top;
+            if (flag == 1) {
+                document.onmousemove = null;
+                document.onmouseup = null;
+                canvasDraw();
+            } else if (flag == 2) {
+                endX = positionx;
+                endY = positiony;
+                console.log(endX + "---end--" + endY);
+                drawLineArrow(ctx, startX, startY, endX, endY, lineInitColor);
+                canvasDraw();
+                return false;
+            } else if (flag == 3) {
+                endX = positionx;
+                endY = positiony;
+                console.log(endX + "---end--" + endY);
+                drawLineBroken(ctx, startX, startY, endX, endY, lineInitColor);
+                canvasDraw();
+                return false;
+            }
+
+        }, false);
+        return obj;
+    };
+
+    //画虚线
+    function drawLineBroken(ctx, fromX, fromY, toX, toY, color) {
+        var arrow1_x, arrow1_y, arrow2_x, arrow2_y; //定义箭头开叉的尾部两个点的坐标
+        var customAngle = 30; //假设夹角设定为30°
+        var arrowLangth = 20; //箭头长度为20
+        if (fromX == toX && fromY == toY) {
+            // 开始和结束在同一点
+        } else {
+            var angle = Math.atan2(fromY - toY, fromX - toX) * 180 / Math.PI; //拿到夹角，目前为0°
+        }
+        var angle1 = angle + customAngle; //箭头上方的线与中间直线的角度
+        var angle2 = angle - customAngle; //箭头下方的线与中间直线的角度
+        //JS中sin和cos的参数都为弧度,不要直接把角度传进去
+        var X1 = arrowLangth * Math.cos(angle1 * Math.PI / 180); //得到上方开叉的尾部到中间直线的X轴的长度
+        var Y1 = arrowLangth * Math.sin(angle1 * Math.PI / 180); //得到上方开叉的尾部到中间直线Y轴（切线）的长度
+        var X2 = arrowLangth * Math.cos(angle2 * Math.PI / 180); //得到下方开叉的尾部到中间直线的X轴的长度
+        var Y2 = arrowLangth * Math.sin(angle2 * Math.PI / 180); //得到下方开叉的尾部到中间直线Y轴（切线）的长度
+        console.log(X1 + "||" + X2);
+        arrow1_x = toX + X1; //上方开叉的尾部点的x坐标
+        arrow1_y = toY + Y1; //上方开叉的尾部点的y坐标
+        arrow2_x = toX + X2; //下方开叉的尾部点的x坐标
+        arrow2_y = toY + Y2; //下方开叉的尾部点的y坐标
+        //虚线(中间那条长线)
+        ctx.beginPath();
+        ctx.setLineDash([15, 5]); //虚线
+        ctx.moveTo(fromX, fromY); //起始点
+        ctx.lineTo(toX, toY); //结束点
+        ctx.strokeStyle = color; //虚线颜色
+        ctx.stroke();
+        //画上边箭头线
+        ctx.beginPath();
+        ctx.setLineDash([]);
+        ctx.moveTo(arrow1_x, arrow1_y); //上箭头坐标
+        ctx.lineTo(toX, toY);
+        ctx.lineTo(arrow2_x, arrow2_y); //下箭头坐标
+        ctx.strokeStyle = color;
+        ctx.stroke();
+    }
+
+
+    // 画箭头
+    function drawLineArrow(ctx, fromX, fromY, toX, toY, color) {
+        var headlen = 20; //自定义箭头线的长度
+        var theta = 15; //自定义箭头线与直线的夹角
+        var arrowX_top, arrowY_top, arrowX_bottom, arrowY_bottom; //箭头线终点坐标
+        // 计算各角度和对应的箭头终点坐标(Math.atan2(y,x)得出的是弧度 再转为角度)
+        var angle;
+        if (fromX == toX && fromY == toY) {
+            // angle = 90; //AR页面中在一个点鼠标按下并抬起,呈90°
+        } else {
+            angle = Math.atan2(fromY - toY, fromX - toX) * 180 / Math.PI;
+        }
+        var angle1 = (angle + theta) * Math.PI / 180;
+        var angle2 = (angle - theta) * Math.PI / 180;
+        var topX = headlen * Math.cos(angle1);
+        var topY = headlen * Math.sin(angle1);
+        var botX = headlen * Math.cos(angle2);
+        var botY = headlen * Math.sin(angle2);
+
+        arrowX_top = toX + topX;
+        arrowY_top = toY + topY;
+        arrowX_bottom = toX + botX;
+        arrowY_bottom = toY + botY;
+
+        //中点坐标公式X=(X1+X2)/2  Y=(Y1+Y2)/2
+        //已知点A(arrowX_top,arrowY_top);
+        //已知点B(arrowX_bottom,arrowY_bottom);
+        //设C为中点(middle_x,middle_y)
+        var middle_c_x = (arrowX_top + arrowX_bottom) / 2;
+        var middle_c_y = (arrowY_top + arrowY_bottom) / 2;
+
+        // 设D为A,C中点(middle_d_x,middle_d_y)
+        var middle_d_x = (arrowX_top + middle_c_x) / 2;
+        var middle_d_y = (arrowY_top + middle_c_y) / 2;
+
+        // 设E为B,C中点(middle_e_x,middle_e_y)
+        var middle_e_x = (arrowX_bottom + middle_c_x) / 2;
+        var middle_e_y = (arrowY_bottom + middle_c_y) / 2;
+
+        //以起始点为圆心 画半径为5的实心圆
+        ctx.beginPath();
+        // ctx.arc(fromX, fromY, 5, 0, 2 * Math.PI);//箭头根部圆
+        ctx.arc(fromX, fromY, 0, 0, 2 * Math.PI);
+        // ctx.strokeStyle = "rgb(130, 210, 210)";//圆的边框颜色
+        ctx.strokeStyle = color;
+        ctx.stroke();
+        // ctx.fillStyle = "rgb(130, 210, 210)";//底部圆的填充颜色
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        //虚线(中间那条长线)
+        ctx.beginPath();
+        ctx.setLineDash([15, 5]); //虚线
+        //画虚直线(画到了三角形和虚线交点处，不是画到头的)
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(middle_c_x, middle_c_y);
+        // ctx.strokeStyle = "rgb(130, 210, 210)";//虚线颜色
+        ctx.strokeStyle = color;
+        ctx.stroke();
+
+        //实线(所有边线)
+        ctx.beginPath();
+        ctx.setLineDash([]); //实线
+        //画上边箭头线
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(arrowX_top, arrowY_top); //上箭头坐标
+        ctx.lineTo(middle_d_x, middle_d_y); //上箭头中间点坐标
+        ctx.lineTo(fromX, fromY);
+        //画下边箭头线
+        ctx.lineTo(middle_e_x, middle_e_y); //下箭头中间点坐标
+        ctx.lineTo(arrowX_bottom, arrowY_bottom); //下箭头坐标
+        ctx.lineTo(toX, toY);
+        ctx.strokeStyle = color;
+        // ctx.strokeStyle = "rgb(130, 210, 210)";//箭头边框颜色
+        ctx.stroke();
+
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    // 播放视频
+    function play() {
+        flag = 0;
+        clear_line();
+        v.play();
+        pen_click_remove();
+    }
+
+    // 暂停视频
+    function pause() {
+        v.pause();
+    }
+
+    // 重播视频
+    function restart() {
+        flag = 0;
+        clear_line();
+        v.currentTime = 0.0
+        v.play()
+        pen_click_remove();
+    }
+
+
+
+    /**时间
+     *currentTime
+     */
+    var nowTime = document.getElementById('now_time');
+    var duration = document.getElementById('duration');
+    nowTime.textContent = "00:00";
+    duration.textContent = "00:00";
+
+    function parseTime(time) {
+        time = Math.floor(time);
+        var _m, _s;
+        _m = Math.floor(time / 60);
+        _s = time - _m * 60;
+        if (_m < 10) {
+            _m = '0' + _m;
+        }
+        if (_s < 10) {
+            _s = '0' + _s;
+        }
+        return _m + ':' + _s
+    }
+
+    v.addEventListener('timeupdate', function () {
+        nowTime.textContent = parseTime(v.currentTime);
+        getProgress();
+    })
+
+    v.addEventListener('loadedmetadata', function () {
+        duration.textContent = parseTime(v.duration);
+    })
+
+    function changeVideoTimeChangeFn() {
+        nowTime.textContent = parseTime(v.currentTime);
+        getProgress();
+        playProgress.style.width = "0px";
+    }
+
+
+
+    /**进度条
+     *
+     */
+    var progressWrap = document.getElementById("progressWrap");
+    var playProgress = document.getElementById("playProgress");
+
+    function getProgress() {
+        var percent = v.currentTime / v.duration;
+        playProgress.style.width = percent * (progressWrap.offsetWidth) + "px";
+    }
+
+    // 鼠标在播放条上点击时进行捕获并进行处理
+    function videoSeek(e) {
+        enhanceVideoSeek(e);
+    }
+
+    function enhanceVideoSeek(e) {
+        var length = e.changedTouches[0].clientX - progressWrap.offsetLeft;
+        var percent = length / progressWrap.offsetWidth;
+        playProgress.style.width = percent * (progressWrap.offsetWidth) + "px";
+        v.currentTime = percent * v.duration;
+        console.log(v.currentTime);
+    }
+
+    progressWrap.addEventListener('touchstart', function (e) {
+        console.log('touchstart');
+        v.play();
+        v.pause();
+        clear_line();
+    }, false);
+
+    progressWrap.addEventListener('touchmove', function (e) {
+        console.log('touchmove');
+        videoSeek(e);
+        v.pause();
+    })
+
+    progressWrap.addEventListener('touchend', function (e) {
+        console.log('touchend');
+        videoSeek(e);
+        v.pause();
+    })
+</script>
+
+</html>
