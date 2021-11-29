@@ -10,4 +10,4 @@ You don't need a PHP environment to see the effect when you download it, and the
 要求使用ipad作为操控端进行写画，在大屏幕端呈现
 在视频上可以写写画画，由于这个之前的需求是在ipad上使用的，所以其中支持的都是touch事件
 有需要的可以自行修改
-下载后无需php环境也可以看到效果，内容中有完整的注释
+下载后无需php环境，运行即可查看效果,web端需在调试中将设备调整为ipad
